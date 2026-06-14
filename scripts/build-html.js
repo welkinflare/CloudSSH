@@ -35,12 +35,12 @@ try {
   }
 
   // 4. Inline CSS (replace <link rel="stylesheet" ...>)
-  html = html.replace(/<link[^>]*rel=["']stylesheet["'][^>]*href=["']\/assets\/[^"']+["'][^>]*>/i, `<style>${cssContent}</style>`);
-  html = html.replace(/<link[^>]*rel=["']stylesheet["'][^>]*href=["']\/src\/[^"']+["'][^>]*>/i, `<style>${cssContent}</style>`);
+  html = html.replace(/<link[^>]*rel=["']stylesheet["'][^>]*href=["']\/assets\/[^"']+["'][^>]*>/i, () => `<style>${cssContent}</style>`);
+  html = html.replace(/<link[^>]*rel=["']stylesheet["'][^>]*href=["']\/src\/[^"']+["'][^>]*>/i, () => `<style>${cssContent}</style>`);
 
   // 5. Inline JS (replace <script type="module" src="/src/main.ts"></script> or similar)
-  html = html.replace(/<script[^>]*type=["']module["'][^>]*src=["']\/assets\/[^"']+["'][^>]*><\/script>/i, `<script type="module">${jsContent}</script>`);
-  html = html.replace(/<script[^>]*type=["']module["'][^>]*src=["']\/src\/[^"']+["'][^>]*><\/script>/i, `<script type="module">${jsContent}</script>`);
+  html = html.replace(/<script[^>]*type=["']module["'][^>]*src=["']\/assets\/[^"']+["'][^>]*><\/script>/i, () => `<script type="module">${jsContent}</script>`);
+  html = html.replace(/<script[^>]*type=["']module["'][^>]*src=["']\/src\/[^"']+["'][^>]*><\/script>/i, () => `<script type="module">${jsContent}</script>`);
 
   // 6. Write to src/worker/html.ts
   const escapedHtml = html
