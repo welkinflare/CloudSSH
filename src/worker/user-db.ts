@@ -61,6 +61,13 @@ export class UserDBDO {
 
       CREATE INDEX IF NOT EXISTS idx_servers_user ON servers(user_id);
       CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+
+      CREATE TABLE IF NOT EXISTS rate_limits (
+        ip          TEXT PRIMARY KEY,
+        count       INTEGER NOT NULL DEFAULT 1,
+        reset_time  TEXT NOT NULL,
+        created_at  TEXT DEFAULT (datetime('now'))
+      );
     `);
   }
 
@@ -112,6 +119,11 @@ export class UserDBDO {
       // --- One-time-token 消费 ---
       if (path === '/internal/connect-token/consume' && request.method === 'POST') {
         return this.handleConsumeToken(request);
+      }
+
+      // --- 速率限制检查 ---
+      if (path === '/internal/rate-limit/check' && request.method === 'POST') {
+        return this.handleRateLimitCheck(request);
       }
 
       return Response.json({ error: 'Not Found' }, { status: 404 });
@@ -470,5 +482,61 @@ export class UserDBDO {
       false,
       ['encrypt', 'decrypt']
     );
+  }
+
+  // ==================== 速率限制 ====================
+
+  private async handleRateLimitCheck(request: Request): Promise<Response> {
+    const { ip, maxRequests, windowMs } = await request.json<{
+      ip: string;
+      maxRequests: number;
+      windowMs: number;
+    }>();
+
+    if (!ip) {
+      return Response.json({ error: 'Missing IP address' }, { status: 400 });
+    }
+
+    const now = new Date();
+    const resetTime = new Date(now.getTime() + windowMs).toISOString();
+
+    // 查询当前IP的速率限制记录
+    const rows = this.db.exec(
+      'SELECT count, reset_time FROM rate_limits WHERE ip = ?',
+      ip
+    ).toArray();
+
+    if (rows.length === 0) {
+      // 新IP，创建记录
+      this.db.exec(
+        'INSERT INTO rate_limits (ip, count, reset_time) VALUES (?, 1, ?)',
+        ip,
+        resetTime
+      );
+      return Response.json({ limited: false });
+    }
+
+    const row = rows[0] as any;
+    const resetTimeDb = new Date(row.reset_time);
+    
+    if (now > resetTimeDb) {
+      // 窗口已过期，重置计数器
+      this.db.exec(
+        'UPDATE rate_limits SET count = 1, reset_time = ? WHERE ip = ?',
+        resetTime,
+        ip
+      );
+      return Response.json({ limited: false });
+    }
+
+    // 窗口内，增加计数器
+    const newCount = row.count + 1;
+    this.db.exec(
+      'UPDATE rate_limits SET count = ? WHERE ip = ?',
+      newCount,
+      ip
+    );
+
+    return Response.json({ limited: newCount > maxRequests });
   }
 }

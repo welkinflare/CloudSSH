@@ -12,6 +12,9 @@ export { SSHSessionDO } from './durable-object';
 export { UserDBDO } from './user-db';
 
 // --- Rate Limiting (per-edge-node, best-effort) ---
+// 注意：在 Cloudflare Workers 分布式环境中，内存中的速率限制无效。
+// 建议使用 Cloudflare Dashboard 中的内置速率限制功能。
+// 此处提供基于内存的简单实现作为备用方案。
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_MAX = 10;      // max requests per window
 const RATE_LIMIT_WINDOW = 60000; // 1 minute window
@@ -25,6 +28,26 @@ function isRateLimited(ip: string): boolean {
   }
   entry.count++;
   return entry.count > RATE_LIMIT_MAX;
+}
+
+// 分布式速率限制（使用 Durable Object）
+async function isDistributedRateLimited(env: Env, ip: string): Promise<boolean> {
+  try {
+    // 使用 UserDBDO 进行分布式速率限制
+    const stub = getUserDBStub(env);
+    const response = await stub.fetch(new Request('http://internal/internal/rate-limit/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip, maxRequests: RATE_LIMIT_MAX, windowMs: RATE_LIMIT_WINDOW }),
+    }));
+    
+    if (!response.ok) return false;
+    const result = await response.json<{ limited: boolean }>();
+    return result.limited;
+  } catch {
+    // 如果分布式速率限制失败，回退到本地速率限制
+    return isRateLimited(ip);
+  }
 }
 
 async function verifyTurnstile(token: string, secret: string, ip: string): Promise<boolean> {
@@ -44,31 +67,59 @@ async function verifyTurnstile(token: string, secret: string, ip: string): Promi
 // --- Simple token-based verification for session-level ---
 const VERIFIED_TOKEN_TTL = 24 * 60 * 60 * 1000; // 24 hours (fallback for token validation)
 
-function generateVerifiedToken(secret: string): string {
+async function generateVerifiedToken(secret: string): Promise<string> {
   const expires = Date.now() + VERIFIED_TOKEN_TTL;
   const payload = `${expires}`;
-  // Simple HMAC using Web Crypto would be better, but for simplicity use a hash
-  const signature = Array.from(
-    new Uint8Array(
-      new TextEncoder().encode(`${payload}:${secret}`)
-    )
-  ).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
-  return `${payload}:${signature}`;
+  
+  // 使用 HMAC-SHA256 进行签名
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    new TextEncoder().encode(payload)
+  );
+  
+  // 转换为十六进制字符串
+  const signatureHex = Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  
+  return `${payload}:${signatureHex}`;
 }
 
-function isVerifiedTokenValid(token: string, secret: string): boolean {
+async function isVerifiedTokenValid(token: string, secret: string): Promise<boolean> {
   try {
     const [expiresStr, signature] = token.split(':');
     const expires = parseInt(expiresStr);
     if (isNaN(expires) || Date.now() > expires) return false;
     
-    const expectedSignature = Array.from(
-      new Uint8Array(
-        new TextEncoder().encode(`${expiresStr}:${secret}`)
-      )
-    ).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+    // 使用 HMAC-SHA256 验证签名
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
     
-    return signature === expectedSignature;
+    // 将十六进制签名转换回字节数组
+    const signatureBytes = new Uint8Array(
+      signature.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
+    );
+    
+    return await crypto.subtle.verify(
+      'HMAC',
+      key,
+      signatureBytes,
+      new TextEncoder().encode(expiresStr)
+    );
   } catch {
     return false;
   }
@@ -128,7 +179,7 @@ export default {
       }
 
       // Issue a verified token as a session cookie (no Max-Age = session cookie, expires when browser closes)
-      const verifiedToken = generateVerifiedToken(env.TURNSTILE_SECRET);
+      const verifiedToken = await generateVerifiedToken(env.TURNSTILE_SECRET);
       return new Response(JSON.stringify({ success: true }), {
         headers: {
           'Content-Type': 'application/json',
@@ -140,9 +191,9 @@ export default {
     // ==================== SSH WebSocket ====================
 
     if (url.pathname === '/api/ssh') {
-      // Apply rate limiting
+      // Apply rate limiting (distributed via Durable Object)
       const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown';
-      if (isRateLimited(clientIP)) {
+      if (await isDistributedRateLimited(env, clientIP)) {
         return new Response('Too Many Requests', { status: 429 });
       }
 
@@ -159,7 +210,7 @@ export default {
         const verifiedCookie = cookies.split(';').find(c => c.trim().startsWith('cf_verified='));
         const verifiedToken = verifiedCookie?.split('=')[1];
 
-        if (!verifiedToken || !isVerifiedTokenValid(verifiedToken, env.TURNSTILE_SECRET)) {
+        if (!verifiedToken || !await isVerifiedTokenValid(verifiedToken, env.TURNSTILE_SECRET)) {
           // No valid cookie, check Turnstile token
           const turnstileToken = url.searchParams.get('turnstile_token');
           if (!turnstileToken) {
