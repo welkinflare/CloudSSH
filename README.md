@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
   <h1>CloudSSH</h1>
   <p>一个基于 Cloudflare Workers 的 Serverless Web SSH 终端：通过浏览器直接连接和管理你的服务器。</p>
   <p><b>极致轻量 · 开箱即用 · 赛博朋克 UI</b></p>
@@ -109,7 +109,7 @@ flowchart TB
 1. **Fork 本仓库** 到你的 GitHub 账号。
 2. **修改域名**：在进行部署前，请先将 `wrangler.toml` 中的自定义域名改成你自己的域名（要求：域名需要先在 Cloudflare 中完成注册或接入）。
 3. **一键部署**：登录 Cloudflare，进入 Workers & Pages 绑定你的 GitHub 账号，选择刚才 Fork 的仓库进行应用创建。
-4. **填写构建命令**：在部署设置中，请务必将“构建命令”（Build command）填写为 `npm install -g pnpm && pnpm install && pnpm run build:frontend`，然后点击保存并部署（无需填写构建输出目录）。
+4. **填写构建命令**：在部署设置中，请务必将“构建命令”（Build command）填写为 `pnpm run build:frontend`，然后点击保存并部署（无需填写构建输出目录）。
 
 #### 方式二：本地命令行部署
 
