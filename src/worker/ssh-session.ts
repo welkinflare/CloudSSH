@@ -884,7 +884,7 @@ export class SSHSession {
           this.sendStatus('Shell 已就绪');
         }
         const outputData = this.channel.handleChannelData(payload);
-        this.ws.send(outputData.slice().buffer as ArrayBuffer);
+        this.ws.send(outputData);
         const adjustMsg = this.channel.buildWindowAdjust(outputData.length);
         await this.sendEncrypted(adjustMsg);
         break;

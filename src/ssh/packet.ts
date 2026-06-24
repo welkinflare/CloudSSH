@@ -1,15 +1,110 @@
 import { SSHPacket } from '../types';
-import { readUint32 } from './utils';
+import { readUint32, writeUint32 } from './utils';
+
+const EMPTY_BUFFER = new Uint8Array(0);
+const COMPACT_CHUNKS_THRESHOLD = 32;
 
 export class SSHPacketParser {
-  private buffer: Uint8Array = new Uint8Array(0);
+  private chunks: Uint8Array[] = [];
+  private chunkIndex: number = 0;
+  private readOffset: number = 0;
+  private bufferedLength: number = 0;
   private seqNum: number = 0;
 
   feed(data: Uint8Array): void {
-    const merged = new Uint8Array(this.buffer.length + data.length);
-    merged.set(this.buffer);
-    merged.set(data, this.buffer.length);
-    this.buffer = merged;
+    if (data.length === 0) {
+      return;
+    }
+
+    this.chunks.push(data);
+    this.bufferedLength += data.length;
+  }
+
+  private peekBytes(bytes: number): Uint8Array | null {
+    if (bytes === 0) {
+      return EMPTY_BUFFER;
+    }
+
+    if (this.bufferedLength < bytes) {
+      return null;
+    }
+
+    const first = this.chunks[this.chunkIndex];
+    if (first) {
+      const firstAvailable = first.length - this.readOffset;
+      if (firstAvailable >= bytes) {
+        return first.subarray(this.readOffset, this.readOffset + bytes);
+      }
+    }
+
+    const result = new Uint8Array(bytes);
+    let copied = 0;
+
+    for (let i = this.chunkIndex; copied < bytes; i++) {
+      const chunk = this.chunks[i];
+      const start = i === this.chunkIndex ? this.readOffset : 0;
+      const take = Math.min(chunk.length - start, bytes - copied);
+      result.set(chunk.subarray(start, start + take), copied);
+      copied += take;
+    }
+
+    return result;
+  }
+
+  private readBytes(bytes: number): Uint8Array | null {
+    const result = this.peekBytes(bytes);
+    if (!result) {
+      return null;
+    }
+
+    this.consumeBytes(bytes);
+    return result;
+  }
+
+  private consumeBytes(bytes: number): void {
+    if (bytes === 0) {
+      return;
+    }
+
+    if (bytes > this.bufferedLength) {
+      throw new Error('Cannot consume more bytes than buffered');
+    }
+
+    this.bufferedLength -= bytes;
+
+    while (bytes > 0) {
+      const chunk = this.chunks[this.chunkIndex];
+      const available = chunk.length - this.readOffset;
+
+      if (bytes < available) {
+        this.readOffset += bytes;
+        this.compactChunks();
+        return;
+      }
+
+      bytes -= available;
+      this.chunkIndex++;
+      this.readOffset = 0;
+    }
+
+    this.compactChunks();
+  }
+
+  private compactChunks(): void {
+    if (this.bufferedLength === 0) {
+      this.chunks = [];
+      this.chunkIndex = 0;
+      this.readOffset = 0;
+      return;
+    }
+
+    if (
+      this.chunkIndex > COMPACT_CHUNKS_THRESHOLD &&
+      this.chunkIndex * 2 >= this.chunks.length
+    ) {
+      this.chunks = this.chunks.slice(this.chunkIndex);
+      this.chunkIndex = 0;
+    }
   }
 
   async nextPacket(blockSize: number, decrypt: (
@@ -18,22 +113,24 @@ export class SSHPacketParser {
   macLength: number = 0,
   verifyMac?: (packet: Uint8Array, mac: Uint8Array, seq: number) => boolean | Promise<boolean>): Promise<SSHPacket | null> {
     if (hasAuthTag) {
-      if (this.buffer.length < 4) return null;
-      const packetLength = readUint32(this.buffer, 0);
+      const lengthBytes = this.peekBytes(4);
+      if (!lengthBytes) return null;
+
+      const packetLength = readUint32(lengthBytes, 0);
       const expectedSize = 4 + packetLength + 16;
 
-      if (this.buffer.length < expectedSize) return null;
+      if (this.bufferedLength < expectedSize) return null;
 
-      const raw = this.buffer.slice(0, expectedSize);
-      this.buffer = this.buffer.slice(expectedSize);
+      const raw = this.readBytes(expectedSize);
+      if (!raw) return null;
 
-      const lengthField = raw.slice(0, 4);
-      const dataToDecrypt = raw.slice(4);
+      const lengthField = raw.subarray(0, 4);
+      const dataToDecrypt = raw.subarray(4);
       const decrypted = await decrypt(dataToDecrypt, this.seqNum, lengthField, true);
       if (!decrypted) return null;
 
       const paddingLength = decrypted[0];
-      const payload = decrypted.slice(1, 1 + packetLength - 1 - paddingLength);
+      const payload = decrypted.subarray(1, 1 + packetLength - 1 - paddingLength);
 
       this.seqNum++;
 
@@ -41,28 +138,28 @@ export class SSHPacketParser {
         length: packetLength,
         paddingLength,
         payload,
-        mac: raw.slice(4 + packetLength),
+        mac: raw.subarray(4 + packetLength),
       };
     }
 
-    if (this.buffer.length < blockSize) return null;
+    const encryptedHeader = this.peekBytes(blockSize);
+    if (!encryptedHeader) return null;
 
     const header = await decrypt(
-      this.buffer.slice(0, blockSize), this.seqNum, undefined, false
+      encryptedHeader, this.seqNum, undefined, false
     );
     if (!header) return null;
 
-    const packetLength = (header[0] << 24) | (header[1] << 16) |
-                         (header[2] << 8) | header[3];
+    const packetLength = readUint32(header, 0);
 
     const totalBlocks = Math.ceil((4 + packetLength) / blockSize);
     const totalSize = totalBlocks * blockSize;
 
-    if (this.buffer.length < totalSize + macLength) return null;
+    if (this.bufferedLength < totalSize + macLength) return null;
 
-    const encryptedPacket = this.buffer.slice(0, totalSize);
-    const mac = this.buffer.slice(totalSize, totalSize + macLength);
-    this.buffer = this.buffer.slice(totalSize + macLength);
+    const encryptedPacket = this.readBytes(totalSize);
+    const mac = this.readBytes(macLength);
+    if (!encryptedPacket || !mac) return null;
 
     const decrypted = await decrypt(encryptedPacket, this.seqNum, undefined, true);
     if (!decrypted) return null;
@@ -75,7 +172,7 @@ export class SSHPacketParser {
     }
 
     const paddingLength = decrypted[4];
-    const payload = decrypted.slice(5, 5 + packetLength - 1 - paddingLength);
+    const payload = decrypted.subarray(5, 5 + packetLength - 1 - paddingLength);
 
     this.seqNum++;
 
@@ -96,7 +193,7 @@ export class SSHPacketParser {
   }
 
   getBufferLength(): number {
-    return this.buffer.length;
+    return this.bufferedLength;
   }
 }
 
@@ -126,23 +223,18 @@ export class SSHPacketBuilder {
     const packet = new Uint8Array(totalLength);
 
     const pl = 1 + payload.length + paddingLength;
-    packet[0] = (pl >> 24) & 0xff;
-    packet[1] = (pl >> 16) & 0xff;
-    packet[2] = (pl >> 8) & 0xff;
-    packet[3] = pl & 0xff;
+    writeUint32(packet, 0, pl);
 
     packet[4] = paddingLength;
 
     packet.set(payload, 5);
 
-    const randomPadding = new Uint8Array(paddingLength);
-    crypto.getRandomValues(randomPadding);
-    packet.set(randomPadding, 5 + payload.length);
+    crypto.getRandomValues(packet.subarray(5 + payload.length));
 
     if (encrypt) {
       if (hasAuthTag) {
-        const lengthField = packet.slice(0, 4);
-        const dataToEncrypt = packet.slice(4);
+        const lengthField = packet.subarray(0, 4);
+        const dataToEncrypt = packet.subarray(4);
         const encryptedData = await encrypt(dataToEncrypt, seqNum, lengthField);
         const result = new Uint8Array(4 + encryptedData.length);
         result.set(lengthField, 0);

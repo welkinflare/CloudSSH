@@ -1,4 +1,11 @@
-import { concat, encodeUint32 } from './utils';
+import { writeUint32 } from './utils';
+
+function buildMacData(seqNum: number, packet: Uint8Array): Uint8Array {
+  const data = new Uint8Array(4 + packet.length);
+  writeUint32(data, 0, seqNum);
+  data.set(packet, 4);
+  return data;
+}
 
 export class SSHAESGCMCipher {
   private key: CryptoKey | null = null;
@@ -93,11 +100,12 @@ export class SSHAESCTRCipher {
   }
 
   private incCounter(blocks: number): void {
-    for (let block = 0; block < blocks; block++) {
-      for (let i = 15; i >= 0; i--) {
-        this.counter[i]++;
-        if (this.counter[i] !== 0) break;
-      }
+    let carry = blocks;
+    for (let i = 15; i >= 0 && carry > 0; i--) {
+      const add = carry % 256;
+      const sum = this.counter[i] + add;
+      this.counter[i] = sum & 0xff;
+      carry = Math.floor(carry / 256) + (sum >>> 8);
     }
   }
 
@@ -173,14 +181,12 @@ export class SSHHMAC {
 
   async sign(packet: Uint8Array, seqNum: number): Promise<Uint8Array> {
     if (!this.key) throw new Error('MAC not initialized');
-    const data = concat(encodeUint32(seqNum), packet);
-    return new Uint8Array(await crypto.subtle.sign('HMAC', this.key, data));
+    return new Uint8Array(await crypto.subtle.sign('HMAC', this.key, buildMacData(seqNum, packet)));
   }
 
   async verify(packet: Uint8Array, seqNum: number, expected: Uint8Array): Promise<boolean> {
     if (!this.key) throw new Error('MAC not initialized');
-    const data = concat(encodeUint32(seqNum), packet);
-    return crypto.subtle.verify('HMAC', this.key, expected, data);
+    return crypto.subtle.verify('HMAC', this.key, expected, buildMacData(seqNum, packet));
   }
 }
 

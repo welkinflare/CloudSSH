@@ -1,15 +1,22 @@
 import {
   SSH_MSG_CHANNEL_OPEN,
-  SSH_MSG_CHANNEL_OPEN_CONFIRMATION,
   SSH_MSG_CHANNEL_WINDOW_ADJUST,
   SSH_MSG_CHANNEL_DATA,
-  SSH_MSG_CHANNEL_EOF,
-  SSH_MSG_CHANNEL_CLOSE,
-  SSH_MSG_CHANNEL_REQUEST,
-  SSH_MSG_CHANNEL_SUCCESS,
-  SSH_MSG_CHANNEL_FAILURE
+  SSH_MSG_CHANNEL_REQUEST
 } from '../types';
-import { encodeString, encodeUint32, readUint32, concat } from './utils';
+import { encodeString, readUint32, writeUint32 } from './utils';
+
+const SESSION = encodeString('session');
+const PTY_REQ = encodeString('pty-req');
+const SHELL = encodeString('shell');
+const XTERM_256COLOR = encodeString('xterm-256color');
+const WINDOW_CHANGE = encodeString('window-change');
+const EMPTY_TERMINAL_MODES = encodeString(new Uint8Array([0]));
+
+function writeBytes(target: Uint8Array, offset: number, source: Uint8Array): number {
+  target.set(source, offset);
+  return offset + source.length;
+}
 
 export class SSHChannel {
   private localChannelID: number = 0;
@@ -21,13 +28,16 @@ export class SSHChannel {
   buildOpenSession(): Uint8Array {
     this.localChannelID = 0;
 
-    return concat(
-      new Uint8Array([SSH_MSG_CHANNEL_OPEN]),
-      encodeString('session'),
-      encodeUint32(this.localChannelID),
-      encodeUint32(this.localWindowSize),
-      encodeUint32(this.maxPacketSize)
-    );
+    const payload = new Uint8Array(1 + SESSION.length + 12);
+    let offset = 0;
+    payload[offset++] = SSH_MSG_CHANNEL_OPEN;
+    offset = writeBytes(payload, offset, SESSION);
+    writeUint32(payload, offset, this.localChannelID);
+    offset += 4;
+    writeUint32(payload, offset, this.localWindowSize);
+    offset += 4;
+    writeUint32(payload, offset, this.maxPacketSize);
+    return payload;
   }
 
   handleOpenConfirmation(payload: Uint8Array): void {
@@ -42,38 +52,46 @@ export class SSHChannel {
   }
 
   buildPTYRequest(cols: number, rows: number): Uint8Array {
-    const modes = new Uint8Array([0]);
-
-    return concat(
-      new Uint8Array([SSH_MSG_CHANNEL_REQUEST]),
-      encodeUint32(this.remoteChannelID),
-      encodeString('pty-req'),
-      new Uint8Array([0x01]),
-      encodeString('xterm-256color'),
-      encodeUint32(cols),
-      encodeUint32(rows),
-      encodeUint32(0),
-      encodeUint32(0),
-      encodeString(modes)
+    const payload = new Uint8Array(
+      1 + 4 + PTY_REQ.length + 1 + XTERM_256COLOR.length + 16 + EMPTY_TERMINAL_MODES.length
     );
+    let offset = 0;
+    payload[offset++] = SSH_MSG_CHANNEL_REQUEST;
+    writeUint32(payload, offset, this.remoteChannelID);
+    offset += 4;
+    offset = writeBytes(payload, offset, PTY_REQ);
+    payload[offset++] = 0x01;
+    offset = writeBytes(payload, offset, XTERM_256COLOR);
+    writeUint32(payload, offset, cols);
+    offset += 4;
+    writeUint32(payload, offset, rows);
+    offset += 4;
+    writeUint32(payload, offset, 0);
+    offset += 4;
+    writeUint32(payload, offset, 0);
+    offset += 4;
+    writeBytes(payload, offset, EMPTY_TERMINAL_MODES);
+    return payload;
   }
 
   buildShellRequest(): Uint8Array {
-    return concat(
-      new Uint8Array([SSH_MSG_CHANNEL_REQUEST]),
-      encodeUint32(this.remoteChannelID),
-      encodeString('shell'),
-      new Uint8Array([0x01])
-    );
+    const payload = new Uint8Array(1 + 4 + SHELL.length + 1);
+    let offset = 0;
+    payload[offset++] = SSH_MSG_CHANNEL_REQUEST;
+    writeUint32(payload, offset, this.remoteChannelID);
+    offset += 4;
+    offset = writeBytes(payload, offset, SHELL);
+    payload[offset] = 0x01;
+    return payload;
   }
 
   buildChannelData(data: Uint8Array): Uint8Array {
-    return concat(
-      new Uint8Array([SSH_MSG_CHANNEL_DATA]),
-      encodeUint32(this.remoteChannelID),
-      encodeUint32(data.length),
-      data
-    );
+    const payload = new Uint8Array(9 + data.length);
+    payload[0] = SSH_MSG_CHANNEL_DATA;
+    writeUint32(payload, 1, this.remoteChannelID);
+    writeUint32(payload, 5, data.length);
+    payload.set(data, 9);
+    return payload;
   }
 
   handleChannelData(payload: Uint8Array): Uint8Array {
@@ -81,27 +99,32 @@ export class SSHChannel {
     offset += 4;
     const dataLen = readUint32(payload, offset);
     offset += 4;
-    return payload.slice(offset, offset + dataLen);
+    return payload.subarray(offset, offset + dataLen);
   }
 
   buildWindowChange(cols: number, rows: number): Uint8Array {
-    return concat(
-      new Uint8Array([SSH_MSG_CHANNEL_REQUEST]),
-      encodeUint32(this.remoteChannelID),
-      encodeString('window-change'),
-      new Uint8Array([0x00]),
-      encodeUint32(cols),
-      encodeUint32(rows),
-      encodeUint32(0),
-      encodeUint32(0)
-    );
+    const payload = new Uint8Array(1 + 4 + WINDOW_CHANGE.length + 1 + 16);
+    let offset = 0;
+    payload[offset++] = SSH_MSG_CHANNEL_REQUEST;
+    writeUint32(payload, offset, this.remoteChannelID);
+    offset += 4;
+    offset = writeBytes(payload, offset, WINDOW_CHANGE);
+    payload[offset++] = 0x00;
+    writeUint32(payload, offset, cols);
+    offset += 4;
+    writeUint32(payload, offset, rows);
+    offset += 4;
+    writeUint32(payload, offset, 0);
+    offset += 4;
+    writeUint32(payload, offset, 0);
+    return payload;
   }
 
   buildWindowAdjust(bytesToAdd: number): Uint8Array {
-    return concat(
-      new Uint8Array([SSH_MSG_CHANNEL_WINDOW_ADJUST]),
-      encodeUint32(this.remoteChannelID),
-      encodeUint32(bytesToAdd)
-    );
+    const payload = new Uint8Array(9);
+    payload[0] = SSH_MSG_CHANNEL_WINDOW_ADJUST;
+    writeUint32(payload, 1, this.remoteChannelID);
+    writeUint32(payload, 5, bytesToAdd);
+    return payload;
   }
 }

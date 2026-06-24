@@ -14,6 +14,10 @@ export interface SSHConnectionConfig {
   privateKey?: string;
 }
 
+interface ConnectOptions {
+  resetDisplay?: boolean;
+}
+
 export const THEMES = {
   cyberpunk: {
     background: '#0a0a0a',
@@ -45,13 +49,16 @@ export class SSHTerminal {
   private ws: WebSocket | null = null;
   private container: HTMLElement;
   private disposables: { dispose(): void }[] = [];
+  private terminalDisposables: { dispose(): void }[] = [];
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private trzszFilter: TrzszFilter | null = null;
+  private mounted: boolean = false;
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private lastConfig: SSHConnectionConfig | null = null;
   private onSessionClosed?: (event: CloseEvent) => void;
+  private restoreCursorBlinkAfterAltScreenExit: boolean = false;
 
   constructor(containerId: string) {
     this.container = document.getElementById(containerId)!;
@@ -69,6 +76,7 @@ export class SSHTerminal {
     this.fitAddon = new FitAddon();
     this.terminal.loadAddon(this.fitAddon);
     this.terminal.loadAddon(new WebLinksAddon());
+    this.registerAltScreenExitHandler();
 
     window.addEventListener('resize', () => this.fit());
 
@@ -110,7 +118,13 @@ export class SSHTerminal {
   }
 
   mount(): void {
+    if (this.mounted) {
+      this.fit();
+      return;
+    }
+
     this.terminal.open(this.container);
+    this.mounted = true;
     
     // Load WebGL addon after terminal is opened
     try {
@@ -125,17 +139,14 @@ export class SSHTerminal {
     }
 
     this.fit();
-
-    this.terminal.writeln('\x1b[1;33m╔══════════════════════════════════╗\x1b[0m');
-    this.terminal.writeln('\x1b[1;33m║      Connecting to CloudSSH      ║\x1b[0m');
-    this.terminal.writeln('\x1b[1;33m╚══════════════════════════════════╝\x1b[0m');
-    this.terminal.writeln('');
   }
 
-  async connect(config: SSHConnectionConfig): Promise<void> {
+  async connect(config: SSHConnectionConfig, options: ConnectOptions = {}): Promise<void> {
     this.resetActiveConnection();
     this.lastConfig = config;
-    this.terminal.clear();
+    if (options.resetDisplay !== false) {
+      this.showConnectingBanner();
+    }
 
     const termStatus = document.getElementById('term-status');
     if (termStatus) termStatus.innerHTML = '<div class="w-2 h-2 bg-primary-container animate-pulse"></div> Connected';
@@ -187,7 +198,7 @@ export class SSHTerminal {
     this.lastConfig = null;
     this.ws = ws;
     ws.binaryType = 'arraybuffer';
-    this.terminal.clear();
+    this.showConnectingBanner();
 
     const termStatus = document.getElementById('term-status');
     if (termStatus) termStatus.innerHTML = '<div class="w-2 h-2 bg-primary-container animate-pulse"></div> Connected';
@@ -341,6 +352,47 @@ export class SSHTerminal {
     }
   }
 
+  private registerAltScreenExitHandler(): void {
+    this.terminalDisposables.push(
+      this.terminal.parser.registerCsiHandler({ prefix: '?', final: 'l' }, (params) => {
+        if (this.hasAltScreenExitParam(params)) {
+          this.restoreCursorBlinkAfterAltScreenExit = true;
+        }
+        return false;
+      })
+    );
+
+    this.terminalDisposables.push(
+      this.terminal.onWriteParsed(() => {
+        if (!this.restoreCursorBlinkAfterAltScreenExit) return;
+        this.restoreCursorBlinkAfterAltScreenExit = false;
+        this.terminal.options.cursorBlink = true;
+      })
+    );
+  }
+
+  private hasAltScreenExitParam(params: (number | number[])[]): boolean {
+    return params.some((param) => {
+      const values = Array.isArray(param) ? param : [param];
+      return values.some(value => value === 47 || value === 1047 || value === 1049);
+    });
+  }
+
+  private resetTerminalDisplay(): void {
+    this.terminal.reset();
+    this.terminal.options.cursorBlink = true;
+    this.terminal.write('\x1b[2J\x1b[3J\x1b[H');
+  }
+
+  private showConnectingBanner(): void {
+    this.resetTerminalDisplay();
+    this.terminal.write(
+      '\x1b[1;33m╔══════════════════════════════════╗\x1b[0m\r\n' +
+      '\x1b[1;33m║      Connecting to CloudSSH      ║\x1b[0m\r\n' +
+      '\x1b[1;33m╚══════════════════════════════════╝\x1b[0m\r\n\r\n'
+    );
+  }
+
   private stopHeartbeat(): void {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
@@ -387,7 +439,7 @@ export class SSHTerminal {
       if (this.lastConfig) {
         this.terminal.writeln('\x1b[32m[+] Reconnecting...\x1b[0m');
         try {
-          await this.connect(this.lastConfig);
+          await this.connect(this.lastConfig, { resetDisplay: false });
         } catch (e) {
           this.terminal.writeln('\x1b[31m[!] Reconnect failed\x1b[0m');
         }
@@ -399,11 +451,13 @@ export class SSHTerminal {
     this.reconnectAttempts = this.maxReconnectAttempts;
     this.resetActiveConnection();
     this.lastConfig = null;
-    this.terminal.clear();
+    this.resetTerminalDisplay();
   }
 
   dispose(): void {
     this.disconnect();
+    this.terminalDisposables.forEach(d => d.dispose());
+    this.terminalDisposables = [];
     this.terminal.dispose();
   }
 }
