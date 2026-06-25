@@ -59,6 +59,7 @@ export class SSHTerminal {
   private lastConfig: SSHConnectionConfig | null = null;
   private onSessionClosed?: (event: CloseEvent) => void;
   private restoreCursorBlinkAfterAltScreenExit: boolean = false;
+  private newlineFlushTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(containerId: string) {
     this.container = document.getElementById(containerId)!;
@@ -223,14 +224,30 @@ export class SSHTerminal {
     // Trzsz file transfer support
     this.trzszFilter = new TrzszFilter({
       writeToTerminal: (data: string | ArrayBuffer | Uint8Array | Blob) => {
+        if (this.newlineFlushTimer) {
+          clearTimeout(this.newlineFlushTimer);
+          this.newlineFlushTimer = null;
+        }
+
+        const writeAndCheckCursor = () => {
+          if (this.terminal.buffer.active.cursorX > 0) {
+            this.newlineFlushTimer = setTimeout(() => {
+              if (this.terminal.buffer.active.cursorX > 0) {
+                this.terminal.write('\r\n');
+              }
+              this.newlineFlushTimer = null;
+            }, 100);
+          }
+        };
+
         if (typeof data === 'string') {
-          this.terminal.write(data);
+          this.terminal.write(data, writeAndCheckCursor);
         } else if (data instanceof Uint8Array) {
-          this.terminal.write(data);
+          this.terminal.write(data, writeAndCheckCursor);
         } else if (data instanceof ArrayBuffer) {
-          this.terminal.write(new Uint8Array(data));
+          this.terminal.write(new Uint8Array(data), writeAndCheckCursor);
         } else if (data instanceof Blob) {
-          data.arrayBuffer().then(buf => this.terminal.write(new Uint8Array(buf)));
+          data.arrayBuffer().then(buf => this.terminal.write(new Uint8Array(buf), writeAndCheckCursor));
         }
       },
       sendToServer: (data: string | Uint8Array) => {
@@ -416,6 +433,11 @@ export class SSHTerminal {
     this.stopHeartbeat();
     this.clearReconnectTimeout();
     this.disposeConnectionDisposables();
+
+    if (this.newlineFlushTimer) {
+      clearTimeout(this.newlineFlushTimer);
+      this.newlineFlushTimer = null;
+    }
 
     const socket = this.ws;
     this.ws = null;

@@ -82,6 +82,8 @@ export class SSHSession {
   private negotiatedMacS2C: string = 'none';
 
   private keepaliveInterval: ReturnType<typeof setInterval> | null = null;
+  private keepaliveFailCount: number = 0;
+  private readonly maxKeepaliveFails: number = 3;
   private shellReadyTimeout: ReturnType<typeof setTimeout> | null = null;
   private terminalSize: TerminalSize = { cols: 120, rows: 40 };
   private debugMode: boolean = false;
@@ -368,12 +370,19 @@ export class SSHSession {
   }
 
   private startKeepalive(): void {
+    this.keepaliveFailCount = 0;
     this.keepaliveInterval = setInterval(async () => {
       try {
         const ignoreMsg = new Uint8Array([SSH_MSG_IGNORE, 0, 0, 0, 0]);
         await this.sendEncrypted(ignoreMsg);
+        this.keepaliveFailCount = 0;
       } catch (e) {
-        this.sendDebug('Keepalive send failed: ' + (e instanceof Error ? e.message : String(e)));
+        this.keepaliveFailCount++;
+        this.sendDebug(`Keepalive send failed (${this.keepaliveFailCount}/${this.maxKeepaliveFails}): ${e instanceof Error ? e.message : String(e)}`);
+        if (this.keepaliveFailCount >= this.maxKeepaliveFails) {
+          this.sendError('SSH 连接超时，保活失败');
+          this.close();
+        }
       }
     }, 25000);
   }
