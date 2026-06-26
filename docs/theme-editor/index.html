@@ -1081,11 +1081,13 @@ const VARIABLE_LABELS = {
 
 let theme = {};
 let activePreset = 'cyberpunk';
+let customized = false;
 
 function initTheme(presetName) {
   const preset = PRESETS[presetName];
   theme = { ...preset.ui };
   activePreset = presetName;
+  customized = false;
   renderControls();
   applyTheme();
   document.querySelectorAll('.preset-chip').forEach(c => {
@@ -1134,6 +1136,7 @@ function renderControls() {
       theme[varName] = e.target.value;
       const textInput = container.querySelector(`input[type="text"][data-var="${varName}"]`);
       if (textInput) textInput.value = e.target.value;
+      customized = true;
       applyTheme();
     });
   });
@@ -1149,6 +1152,7 @@ function renderControls() {
           ? '#' + val[1]+val[1]+val[2]+val[2]+val[3]+val[3]
           : val;
       }
+      customized = true;
       applyTheme();
     });
   });
@@ -1180,6 +1184,7 @@ document.getElementById('import-input').addEventListener('change', (e) => {
       const data = JSON.parse(ev.target.result);
       if (data.ui && typeof data.ui === 'object') {
         theme = { ...data.ui };
+        customized = false;
         if (data.name) {
           document.querySelector('.preset-chip.active')?.classList.remove('active');
           activePreset = null;
@@ -1199,16 +1204,19 @@ document.getElementById('import-input').addEventListener('change', (e) => {
 
 // Export
 document.getElementById('btn-export').addEventListener('click', () => {
+  const isCustom = customized || !activePreset;
   const preset = activePreset ? PRESETS[activePreset] : null;
+  const themeName = isCustom ? 'Custom' : (preset?.name || 'Custom');
+
   const output = {
-    name: preset?.name || 'Custom',
-    terminal: preset?.terminal || {
+    name: themeName,
+    terminal: (isCustom || !preset) ? {
       background: theme['--bg-terminal'] || '#0a0a0a',
       foreground: theme['--text'] || '#cccccc',
       cursor: theme['--accent-secondary'] || '#ffffff',
       cursorAccent: theme['--bg-terminal'] || '#0a0a0a',
       selectionBackground: theme['--border-strong'] || '#333333',
-    },
+    } : preset.terminal,
     ui: { ...theme },
   };
 
@@ -1217,7 +1225,7 @@ document.getElementById('btn-export').addEventListener('click', () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `cloudssh-theme-${(output.name || 'custom').toLowerCase().replace(/\s+/g, '-')}.json`;
+  a.download = `cloudssh-theme-${themeName.toLowerCase().replace(/\s+/g, '-')}.json`;
   a.click();
   URL.revokeObjectURL(url);
 });
