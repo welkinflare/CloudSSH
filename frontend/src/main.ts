@@ -151,13 +151,34 @@ document.getElementById('disconnect-btn')?.addEventListener('click', () => {
 
 // ==================== 主题切换 ====================
 
+const CUSTOM_THEME_VALUE = '__custom__';
 const themeSelector = document.getElementById('theme-selector') as HTMLSelectElement | null;
 
 themeSelector?.addEventListener('change', (e) => {
-  const theme = (e.target as HTMLSelectElement).value as keyof typeof THEMES;
-  terminal.setTheme(theme);
-  localStorage.removeItem('cloudssh_imported_theme');
+  const value = (e.target as HTMLSelectElement).value;
+  if (value === CUSTOM_THEME_VALUE) {
+    const importedRaw = localStorage.getItem('cloudssh_imported_theme');
+    if (importedRaw) {
+      try {
+        terminal.applyImportedTheme(JSON.parse(importedRaw));
+      } catch { /* ignore */ }
+    }
+  } else {
+    terminal.setTheme(value as keyof typeof THEMES);
+    localStorage.removeItem('cloudssh_imported_theme');
+  }
+  localStorage.setItem('cloudssh_theme_selection', value);
 });
+
+function ensureCustomOption(): void {
+  if (!themeSelector) return;
+  if (!themeSelector.querySelector(`option[value="${CUSTOM_THEME_VALUE}"]`)) {
+    const opt = document.createElement('option');
+    opt.value = CUSTOM_THEME_VALUE;
+    opt.textContent = 'Custom';
+    themeSelector.insertBefore(opt, themeSelector.firstChild);
+  }
+}
 
 // ==================== 主题导入 ====================
 
@@ -168,21 +189,38 @@ importThemeBtn?.addEventListener('click', () => {
   importThemeInput?.click();
 });
 
-importThemeInput?.addEventListener('change', (e) => {
+importThemeInput?.addEventListener('change', async (e) => {
   const file = (e.target as HTMLInputElement).files?.[0];
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = (ev) => {
+  reader.onload = async (ev) => {
     try {
       const data = JSON.parse(ev.target!.result as string);
       if (!data.ui || typeof data.ui !== 'object') {
         alert('无效的主题文件：缺少 "ui" 字段');
         return;
       }
-      terminal.applyImportedTheme(data);
+
+      // 保存到 localStorage
       localStorage.setItem('cloudssh_imported_theme', JSON.stringify(data));
-      if (themeSelector) themeSelector.value = '';
+
+      // 尝试保存到云端
+      try {
+        await fetch('/api/user/theme', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ theme_data: data }),
+        });
+      } catch { /* 未登录或网络错误，忽略 */ }
+
+      // 添加 Custom 选项并选中
+      ensureCustomOption();
+      if (themeSelector) themeSelector.value = CUSTOM_THEME_VALUE;
+      localStorage.setItem('cloudssh_theme_selection', CUSTOM_THEME_VALUE);
+
+      // 刷新页面生效
+      location.reload();
     } catch {
       alert('无效的 JSON 文件');
     }
@@ -191,28 +229,66 @@ importThemeInput?.addEventListener('change', (e) => {
   importThemeInput.value = '';
 });
 
-function restoreTheme(): void {
-  const importedRaw = localStorage.getItem('cloudssh_imported_theme');
-  if (importedRaw) {
-    try {
-      const data = JSON.parse(importedRaw);
-      terminal.applyImportedTheme(data);
-      return;
-    } catch {
-      localStorage.removeItem('cloudssh_imported_theme');
+// ==================== 主题恢复 ====================
+
+async function restoreTheme(): Promise<void> {
+  const selection = localStorage.getItem('cloudssh_theme_selection');
+
+  // 尝试从云端加载自定义主题
+  let cloudTheme: Record<string, unknown> | null = null;
+  try {
+    const res = await fetch('/api/user/theme');
+    if (res.ok) {
+      const { theme } = await res.json() as { theme: Record<string, unknown> | null };
+      if (theme) {
+        cloudTheme = theme;
+        // 同步到 localStorage
+        localStorage.setItem('cloudssh_imported_theme', JSON.stringify(theme));
+        ensureCustomOption();
+      }
+    }
+  } catch { /* 未登录，忽略 */ }
+
+  // 如果云端没有但 localStorage 有，也添加 Custom 选项
+  if (!cloudTheme) {
+    const localRaw = localStorage.getItem('cloudssh_imported_theme');
+    if (localRaw) {
+      try {
+        JSON.parse(localRaw);
+        ensureCustomOption();
+      } catch {
+        localStorage.removeItem('cloudssh_imported_theme');
+      }
     }
   }
-  const saved = localStorage.getItem('cloudssh_theme') as keyof typeof THEMES | null;
-  if (saved && THEMES[saved]) {
-    terminal.setTheme(saved);
-    if (themeSelector) themeSelector.value = saved;
+
+  // 恢复选择
+  if (selection === CUSTOM_THEME_VALUE) {
+    const raw = localStorage.getItem('cloudssh_imported_theme');
+    if (raw) {
+      try {
+        terminal.applyImportedTheme(JSON.parse(raw));
+        if (themeSelector) themeSelector.value = CUSTOM_THEME_VALUE;
+        return;
+      } catch { /* ignore */ }
+    }
   }
+
+  if (selection && THEMES[selection as keyof typeof THEMES]) {
+    terminal.setTheme(selection as keyof typeof THEMES);
+    if (themeSelector) themeSelector.value = selection;
+    return;
+  }
+
+  // 默认主题
+  terminal.setTheme('cyberpunk');
+  if (themeSelector) themeSelector.value = 'cyberpunk';
 }
 
 // ==================== 初始化 ====================
 
 async function init(): Promise<void> {
-  restoreTheme();
+  await restoreTheme();
   // 设置版权年份
   const copyrightYearSpan = document.getElementById('copyright-year');
   if (copyrightYearSpan) {

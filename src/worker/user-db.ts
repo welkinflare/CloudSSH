@@ -63,6 +63,12 @@ export class UserDBDO {
       CREATE INDEX IF NOT EXISTS idx_servers_user ON servers(user_id);
       CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 
+      CREATE TABLE IF NOT EXISTS user_themes (
+        user_id     INTEGER PRIMARY KEY REFERENCES users(id),
+        theme_data  TEXT NOT NULL,
+        updated_at  TEXT DEFAULT (datetime('now'))
+      );
+
       CREATE TABLE IF NOT EXISTS rate_limits (
         ip          TEXT PRIMARY KEY,
         count       INTEGER NOT NULL DEFAULT 1,
@@ -120,6 +126,16 @@ export class UserDBDO {
       // --- One-time-token 消费 ---
       if (path === '/internal/connect-token/consume' && request.method === 'POST') {
         return this.handleConsumeToken(request);
+      }
+
+      // --- 用户自定义主题 ---
+      if (path === '/internal/theme' && request.method === 'GET') {
+        const userId = url.searchParams.get('user_id');
+        if (!userId) return Response.json({ error: 'Missing user_id' }, { status: 400 });
+        return this.handleGetTheme(parseInt(userId));
+      }
+      if (path === '/internal/theme' && request.method === 'PUT') {
+        return this.handlePutTheme(request);
       }
 
       // --- 速率限制检查 ---
@@ -350,6 +366,37 @@ export class UserDBDO {
       return Response.json({ error: 'Forbidden' }, { status: 403 });
 
     this.db.exec('DELETE FROM servers WHERE id = ?', serverId);
+    return Response.json({ success: true });
+  }
+
+  // ==================== 用户自定义主题 ====================
+
+  private handleGetTheme(userId: number): Response {
+    const rows = this.db
+      .exec('SELECT theme_data FROM user_themes WHERE user_id = ?', userId)
+      .toArray();
+
+    if (rows.length === 0) {
+      return Response.json({ theme: null });
+    }
+
+    try {
+      return Response.json({ theme: JSON.parse((rows[0] as unknown as { theme_data: string }).theme_data) });
+    } catch {
+      return Response.json({ theme: null });
+    }
+  }
+
+  private async handlePutTheme(request: Request): Promise<Response> {
+    const { user_id, theme_data } = await request.json<{ user_id: number; theme_data: string }>();
+
+    this.db.exec(
+      `INSERT INTO user_themes (user_id, theme_data, updated_at) VALUES (?, ?, datetime('now'))
+       ON CONFLICT(user_id) DO UPDATE SET theme_data = excluded.theme_data, updated_at = excluded.updated_at`,
+      user_id,
+      theme_data
+    );
+
     return Response.json({ success: true });
   }
 

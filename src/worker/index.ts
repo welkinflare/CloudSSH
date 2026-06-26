@@ -142,6 +142,12 @@ export default {
       return handleServersRoute(request, url, env);
     }
 
+    // ==================== Theme Routes (需认证) ====================
+
+    if (url.pathname === '/api/user/theme') {
+      return handleThemeRoute(request, env);
+    }
+
     // ==================== Turnstile Verify ====================
 
     if (url.pathname === '/api/verify' && request.method === 'POST') {
@@ -314,6 +320,36 @@ async function handleServersRoute(request: Request, url: URL, env: Env): Promise
   }
 
   return Response.json({ error: 'Not Found' }, { status: 404 });
+}
+
+// ==================== Theme routes ====================
+
+async function handleThemeRoute(request: Request, env: Env): Promise<Response> {
+  const user = await getAuthenticatedUser(request, env);
+  if (!user) {
+    return Response.json({ error: 'Authentication required' }, { status: 401 });
+  }
+
+  const stub = getUserDBStub(env);
+
+  if (request.method === 'GET') {
+    return stub.fetch(new Request(`http://internal/internal/theme?user_id=${user.id}`, {
+      method: 'GET',
+    }));
+  }
+
+  if (request.method === 'PUT') {
+    const body = await request.json<Record<string, unknown>>();
+    body.user_id = user.id;
+    body.theme_data = JSON.stringify(body.theme_data);
+    return stub.fetch(new Request('http://internal/internal/theme', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }));
+  }
+
+  return Response.json({ error: 'Method not allowed' }, { status: 405 });
 }
 
 // ==================== SSH connection handlers ====================
