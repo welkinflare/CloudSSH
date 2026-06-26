@@ -188,7 +188,7 @@
     .preview-area {
       flex: 1;
       overflow-y: auto;
-      padding: 24px;
+      padding: 20px;
       background: #0a0a0a;
     }
 
@@ -196,15 +196,26 @@
     .preview-area::-webkit-scrollbar-track { background: #111; }
     .preview-area::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
 
+    .preview-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto auto;
+      gap: 16px;
+    }
+
+    .preview-grid .col-terminal {
+      grid-column: 1 / -1;
+    }
+
     .preview-section {
-      margin-bottom: 28px;
+      min-width: 0;
     }
 
     .preview-label {
       font-size: 10px;
       color: #555;
       letter-spacing: 0.15em;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       font-weight: 700;
     }
 
@@ -238,8 +249,7 @@
     /* ===== Login Preview ===== */
     .login-preview {
       background: var(--bg);
-      padding: 40px 20px;
-      min-height: 360px;
+      padding: 24px 16px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -519,10 +529,136 @@
       vertical-align: middle;
     }
 
+    /* ===== User Space Preview ===== */
+    .userspace-preview {
+      background: var(--bg-elevated);
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+
+    .us-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 16px;
+      height: 48px;
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border-strong);
+      flex-shrink: 0;
+    }
+
+    .us-header .logo {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.05em;
+    }
+
+    .us-header .user-area {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .us-header .avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      background: var(--bg-surface);
+    }
+
+    .us-header .username {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+    }
+
+    .us-header .logout-icon {
+      color: var(--error);
+      font-size: 16px;
+    }
+
+    .us-body {
+      flex: 1;
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .us-body .scanlines {
+      position: absolute; inset: 0;
+      background: linear-gradient(to bottom, transparent, transparent 50%, rgba(0,0,0,0.05) 50%, rgba(0,0,0,0.05));
+      background-size: 100% 4px;
+      pointer-events: none;
+    }
+
+    .us-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .us-section-header h2 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.1em;
+    }
+
+    .us-section-header .sub {
+      font-size: 10px;
+      color: var(--text-muted);
+      opacity: 0.6;
+      margin-top: 2px;
+    }
+
+    .us-section-header .add-btn {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      padding: 4px 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .us-cards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .us-footer {
+      padding: 0 16px;
+      height: 36px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--border-strong);
+      font-size: 9px;
+      color: var(--accent-secondary);
+      opacity: 0.6;
+      flex-shrink: 0;
+      background: var(--bg-elevated);
+    }
+
     /* ===== Server Cards Preview ===== */
     .cards-preview {
       background: var(--bg);
-      padding: 24px;
+      padding: 0;
     }
 
     .cards-header {
@@ -687,155 +823,183 @@
   <!-- Preview -->
   <div class="preview-area">
     <div class="theme-scope" id="theme-scope">
+      <div class="preview-grid">
 
-      <!-- Login Page -->
-      <div class="preview-section">
-        <div class="preview-label">LOGIN PAGE</div>
-        <div class="preview-frame">
-          <div class="login-preview">
-            <div class="scanlines"></div>
-            <div class="flicker"></div>
-            <div class="login-card">
-              <div class="login-title">
-                <span class="logo">CloudSSH</span><span class="cursor"></span>
-              </div>
-              <div class="login-box">
-                <div class="top-bar"></div>
-                <div class="header">
-                  <span>CONNECTION_PARAMETERS</span>
-                  <span class="material-symbols-outlined" style="font-size:14px;color:var(--accent-secondary)">terminal</span>
+        <!-- Login Page (Top Left) -->
+        <div class="preview-section">
+          <div class="preview-label">LOGIN PAGE</div>
+          <div class="preview-frame">
+            <div class="login-preview">
+              <div class="scanlines"></div>
+              <div class="flicker"></div>
+              <div class="login-card">
+                <div class="login-title">
+                  <span class="logo">CloudSSH</span><span class="cursor"></span>
                 </div>
-                <div class="login-field">
-                  <label>HOST_ADDRESS</label>
-                  <div class="input-line">
-                    <span class="prefix">&gt;</span>
-                    <span class="placeholder-text">192.168.1.1</span>
+                <div class="login-box">
+                  <div class="top-bar"></div>
+                  <div class="header">
+                    <span>CONNECTION_PARAMETERS</span>
+                    <span class="material-symbols-outlined" style="font-size:14px;color:var(--accent-secondary);font-variation-settings:'FILL' 0">terminal</span>
                   </div>
-                </div>
-                <div style="display:grid;grid-template-columns:3fr 1fr;gap:12px">
+                  <div style="display:grid;grid-template-columns:3fr 1fr;gap:12px;margin-bottom:12px">
+                    <div class="login-field" style="margin-bottom:0">
+                      <label>HOST_ADDRESS</label>
+                      <div class="input-line">
+                        <span class="prefix">&gt;</span>
+                        <span class="placeholder-text">192.168.1.1</span>
+                      </div>
+                    </div>
+                    <div class="login-field" style="margin-bottom:0">
+                      <label>PORT</label>
+                      <div class="input-line">
+                        <span class="prefix">:</span>
+                        <span class="placeholder-text">22</span>
+                      </div>
+                    </div>
+                  </div>
                   <div class="login-field">
                     <label>AUTH_USER</label>
                     <div class="input-line">
-                      <span class="prefix" style="font-size:14px" class="material-symbols-outlined">person</span>
-                      <span class="placeholder-text">root</span>
+                      <span class="material-symbols-outlined prefix" style="font-size:14px">person</span>
+                      <span class="placeholder-text">admin</span>
                     </div>
                   </div>
                   <div class="login-field">
-                    <label>PORT</label>
-                    <div class="input-line">
-                      <span class="prefix">:</span>
-                      <span class="placeholder-text">22</span>
+                    <label>AUTH_METHOD</label>
+                    <div class="auth-tabs">
+                      <span class="auth-tab active">PASSWORD</span>
+                      <span class="auth-tab">PRIVATE_KEY</span>
+                    </div>
+                    <div class="input-line" style="border-bottom:1px solid var(--border-strong);padding-bottom:6px">
+                      <span class="material-symbols-outlined prefix" style="font-size:14px">key</span>
+                      <span class="placeholder-text">••••••••</span>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-top:8px;margin-bottom:4px">
+                    <span style="width:14px;height:14px;border:1px solid var(--border-strong);border-radius:2px;display:inline-block;background:var(--bg-surface)"></span>
+                    <label style="font-size:10px;color:var(--text-muted);cursor:pointer">REMEMBER_CONNECTION</label>
+                  </div>
+                  <button class="connect-btn" style="margin-top:12px">
+                    <span class="material-symbols-outlined" style="font-size:14px">power_settings_new</span>
+                    Execute_Connection
+                  </button>
+                  <div class="status-bar">
+                    <span class="status-text"><span class="status-dot"></span> STATUS: OFFLINE</span>
+                    <span style="font-size:10px;color:var(--text-muted);opacity:0.5">GitHub</span>
+                  </div>
+                </div>
+                <div class="login-footer">
+                  <a href="#">[ GitHub Open Source ]</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- User Space (Top Right) -->
+        <div class="preview-section">
+          <div class="preview-label">USER SPACE</div>
+          <div class="preview-frame">
+            <div class="userspace-preview">
+              <div class="us-header">
+                <span class="logo">CloudSSH</span>
+                <div class="user-area">
+                  <div class="avatar"></div>
+                  <span class="username">admin</span>
+                  <span class="material-symbols-outlined logout-icon" style="font-variation-settings:'FILL' 0">logout</span>
+                </div>
+              </div>
+              <div class="us-body">
+                <div class="scanlines"></div>
+                <div class="us-section-header">
+                  <div>
+                    <h2>SERVER_LIST</h2>
+                    <div class="sub">Manage your SSH connections</div>
+                  </div>
+                  <span class="add-btn">
+                    <span class="material-symbols-outlined" style="font-size:13px">add</span>
+                    ADD_SERVER
+                  </span>
+                </div>
+                <div class="us-cards-grid">
+                  <div class="server-card-mock">
+                    <div class="top-line"></div>
+                    <div class="card-title-row">
+                      <span class="material-symbols-outlined icon" style="font-variation-settings:'FILL' 0">dns</span>
+                      <h3>Production</h3>
+                      <span class="card-badge">PWD</span>
+                    </div>
+                    <div class="card-info">
+                      <div><span class="label">HOST</span><span class="value">192.168.1.10:22</span></div>
+                      <div><span class="label">USER</span><span class="value">root</span></div>
+                    </div>
+                    <div class="card-actions">
+                      <span class="card-btn"><span class="material-symbols-outlined">power_settings_new</span> CONNECT</span>
+                      <span class="card-btn"><span class="material-symbols-outlined">edit</span></span>
+                      <span class="card-btn delete"><span class="material-symbols-outlined">delete</span></span>
+                    </div>
+                  </div>
+                  <div class="server-card-mock">
+                    <div class="top-line"></div>
+                    <div class="card-title-row">
+                      <span class="material-symbols-outlined icon" style="font-variation-settings:'FILL' 0">dns</span>
+                      <h3>Staging</h3>
+                      <span class="card-badge">KEY</span>
+                    </div>
+                    <div class="card-info">
+                      <div><span class="label">HOST</span><span class="value">10.0.0.5:2222</span></div>
+                      <div><span class="label">USER</span><span class="value">deploy</span></div>
+                    </div>
+                    <div class="card-actions">
+                      <span class="card-btn"><span class="material-symbols-outlined">power_settings_new</span> CONNECT</span>
+                      <span class="card-btn"><span class="material-symbols-outlined">edit</span></span>
+                      <span class="card-btn delete"><span class="material-symbols-outlined">delete</span></span>
                     </div>
                   </div>
                 </div>
-                <div class="login-field">
-                  <label>AUTH_METHOD</label>
-                  <div class="auth-tabs">
-                    <span class="auth-tab active">PASSWORD</span>
-                    <span class="auth-tab">PRIVATE_KEY</span>
-                  </div>
-                  <div class="input-line" style="border-bottom:1px solid var(--border-strong);padding-bottom:6px">
-                    <span class="prefix" style="font-size:14px" class="material-symbols-outlined">key</span>
-                    <span class="placeholder-text">••••••••</span>
-                  </div>
-                </div>
-                <button class="connect-btn">
-                  <span class="material-symbols-outlined" style="font-size:14px">power_settings_new</span>
-                  EXECUTE_CONNECTION
-                </button>
-                <div class="status-bar">
-                  <span class="status-text"><span class="status-dot"></span> STATUS: OFFLINE</span>
-                </div>
               </div>
-              <div class="login-footer">
-                <a href="#">[ GitHub Open Source ]</a>
+              <div class="us-footer">
+                <span>© 2025 CLOUD_SSH_TERMINAL</span>
+                <span>Documentation</span>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Terminal -->
-      <div class="preview-section">
-        <div class="preview-label">TERMINAL</div>
-        <div class="preview-frame">
-          <div class="terminal-preview">
-            <div class="scanline"></div>
-            <div class="terminal-statusbar">
-              <span class="connected"><span class="dot-green"></span> Connected</span>
-              <span>Host: 192.168.1.1</span>
-              <span>User: root</span>
-              <span>Port: 22</span>
-            </div>
-            <div class="terminal-body">
-              <div class="line green">[+] WebSocket connected, sending credentials...</div>
-              <div class="line green">[*] Authenticating...</div>
-              <div class="line green">[*] Authentication successful</div>
-              <div class="line white">Welcome to Ubuntu 22.04.3 LTS</div>
-              <div class="line white"> </div>
-              <div class="line"><span class="prompt">root@server</span><span class="white">:</span><span class="path">~</span><span class="white">$ ls -la</span></div>
-              <div class="line white">drwxr-xr-x 5 root root 4096 Jan 15 10:23 .</div>
-              <div class="line white">drwxr-xr-x 3 root root 4096 Jan 15 10:20 ..</div>
-              <div class="line cyan">-rw-r--r-- 1 root root  220 Jan 15 10:20 .bashrc</div>
-              <div class="line cyan">drwxr-xr-x 2 root root 4096 Jan 15 10:23 config</div>
-              <div class="line cyan">-rwxr-xr-x 1 root root 1024 Jan 15 10:23 deploy.sh</div>
-              <div class="line yellow">-rw-r--r-- 1 root root  512 Jan 15 10:22 README.md</div>
-              <div class="line white"> </div>
-              <div class="line"><span class="prompt">root@server</span><span class="white">:</span><span class="path">~</span><span class="white">$ </span><span class="cursor-block"></span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Server Cards -->
-      <div class="preview-section">
-        <div class="preview-label">SERVER LIST</div>
-        <div class="preview-frame">
-          <div class="cards-preview">
-            <div class="cards-header">
-              <h2>SERVER_LIST</h2>
-              <span class="add-btn">+ ADD_SERVER</span>
-            </div>
-            <div class="cards-grid">
-              <div class="server-card-mock">
-                <div class="top-line"></div>
-                <div class="card-title-row">
-                  <span class="material-symbols-outlined icon" style="font-variation-settings:'FILL' 0">dns</span>
-                  <h3>Production</h3>
-                  <span class="card-badge">PWD</span>
-                </div>
-                <div class="card-info">
-                  <div><span class="label">HOST</span><span class="value">192.168.1.10:22</span></div>
-                  <div><span class="label">USER</span><span class="value">root</span></div>
-                </div>
-                <div class="card-actions">
-                  <span class="card-btn"><span class="material-symbols-outlined">power_settings_new</span> CONNECT</span>
-                  <span class="card-btn"><span class="material-symbols-outlined">edit</span></span>
-                  <span class="card-btn delete"><span class="material-symbols-outlined">delete</span></span>
-                </div>
+        <!-- Terminal (Bottom, Full Width) -->
+        <div class="preview-section col-terminal">
+          <div class="preview-label">TERMINAL</div>
+          <div class="preview-frame">
+            <div class="terminal-preview">
+              <div class="scanline"></div>
+              <div class="terminal-statusbar">
+                <span class="connected"><span class="dot-green"></span> Connected</span>
+                <span>Host: 192.168.1.1</span>
+                <span>User: root</span>
+                <span>Port: 22</span>
               </div>
-              <div class="server-card-mock">
-                <div class="top-line"></div>
-                <div class="card-title-row">
-                  <span class="material-symbols-outlined icon" style="font-variation-settings:'FILL' 0">dns</span>
-                  <h3>Staging</h3>
-                  <span class="card-badge">KEY</span>
-                </div>
-                <div class="card-info">
-                  <div><span class="label">HOST</span><span class="value">10.0.0.5:2222</span></div>
-                  <div><span class="label">USER</span><span class="value">deploy</span></div>
-                </div>
-                <div class="card-actions">
-                  <span class="card-btn"><span class="material-symbols-outlined">power_settings_new</span> CONNECT</span>
-                  <span class="card-btn"><span class="material-symbols-outlined">edit</span></span>
-                  <span class="card-btn delete"><span class="material-symbols-outlined">delete</span></span>
-                </div>
+              <div class="terminal-body">
+                <div class="line green">[+] WebSocket connected, sending credentials...</div>
+                <div class="line green">[*] Authenticating...</div>
+                <div class="line green">[*] Authentication successful</div>
+                <div class="line white">Welcome to Ubuntu 22.04.3 LTS</div>
+                <div class="line white"> </div>
+                <div class="line"><span class="prompt">root@server</span><span class="white">:</span><span class="path">~</span><span class="white">$ ls -la</span></div>
+                <div class="line white">drwxr-xr-x 5 root root 4096 Jan 15 10:23 .</div>
+                <div class="line white">drwxr-xr-x 3 root root 4096 Jan 15 10:20 ..</div>
+                <div class="line cyan">-rw-r--r-- 1 root root  220 Jan 15 10:20 .bashrc</div>
+                <div class="line cyan">drwxr-xr-x 2 root root 4096 Jan 15 10:23 config</div>
+                <div class="line cyan">-rwxr-xr-x 1 root root 1024 Jan 15 10:23 deploy.sh</div>
+                <div class="line yellow">-rw-r--r-- 1 root root  512 Jan 15 10:22 README.md</div>
+                <div class="line white"> </div>
+                <div class="line"><span class="prompt">root@server</span><span class="white">:</span><span class="path">~</span><span class="white">$ </span><span class="cursor-block"></span></div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
+      </div>
     </div>
   </div>
 </div>
