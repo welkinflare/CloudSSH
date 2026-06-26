@@ -25,6 +25,8 @@
   --scrollbar-thumb: rgba(60, 75, 54, 0.8);
   --scrollbar-thumb-hover: rgba(134, 149, 125, 0.8);
   --scanline-tint: rgba(74, 246, 38, 0.02);
+  --accent-glow: rgba(74, 246, 38, 0.08);
+  --modal-overlay: rgba(0, 0, 0, 0.8);
 }
 
 body {
@@ -148,7 +150,7 @@ body {
 .server-card:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(74, 246, 38, 0.08);
+  box-shadow: 0 4px 20px var(--accent-glow);
 }
 
 /* 卡片删除动画 */
@@ -165,7 +167,7 @@ body {
 
 /* Modal 遮罩 */
 .modal-overlay {
-  background: rgba(0, 0, 0, 0.8);
+  background: var(--modal-overlay);
   backdrop-filter: blur(4px);
 }
 

@@ -64,6 +64,8 @@ export const UI_THEMES: Record<keyof typeof THEMES, Record<string, string>> = {
     '--scrollbar-thumb': 'rgba(60, 75, 54, 0.8)',
     '--scrollbar-thumb-hover': 'rgba(134, 149, 125, 0.8)',
     '--scanline-tint': 'rgba(74, 246, 38, 0.02)',
+    '--accent-glow': 'rgba(74, 246, 38, 0.08)',
+    '--modal-overlay': 'rgba(0, 0, 0, 0.8)',
   },
   glacier: {
     '--bg': '#0a192f',
@@ -86,6 +88,8 @@ export const UI_THEMES: Record<keyof typeof THEMES, Record<string, string>> = {
     '--scrollbar-thumb': 'rgba(100, 255, 218, 0.2)',
     '--scrollbar-thumb-hover': 'rgba(100, 255, 218, 0.4)',
     '--scanline-tint': 'rgba(100, 255, 218, 0.02)',
+    '--accent-glow': 'rgba(100, 255, 218, 0.08)',
+    '--modal-overlay': 'rgba(0, 0, 0, 0.85)',
   },
   gruvbox: {
     '--bg': '#282828',
@@ -108,6 +112,8 @@ export const UI_THEMES: Record<keyof typeof THEMES, Record<string, string>> = {
     '--scrollbar-thumb': 'rgba(168, 153, 132, 0.3)',
     '--scrollbar-thumb-hover': 'rgba(168, 153, 132, 0.5)',
     '--scanline-tint': 'rgba(184, 187, 38, 0.02)',
+    '--accent-glow': 'rgba(184, 187, 38, 0.08)',
+    '--modal-overlay': 'rgba(0, 0, 0, 0.75)',
   },
 };
 
@@ -322,7 +328,7 @@ export class SSHTerminal {
               if (msg.message === '认证成功') {
                 this.reconnectAttempts = 0;
                 const statusText = document.getElementById('status-text');
-                if (statusText) statusText.innerHTML = '<span class="w-2 h-2 bg-[#4af626] inline-block animate-pulse"></span> STATUS: ONLINE';
+                if (statusText) statusText.innerHTML = '<span class="w-2 h-2 bg-[var(--accent)] inline-block animate-pulse"></span> STATUS: ONLINE';
               }
               break;
             case 'error':
@@ -352,7 +358,7 @@ export class SSHTerminal {
         `\x1b[33m[*] Connection closed (code=${event.code})\x1b[0m`
       );
       const termStatus = document.getElementById('term-status');
-      if (termStatus) termStatus.innerHTML = '<div class="w-2 h-2 bg-red-500"></div> Disconnected';
+      if (termStatus) termStatus.innerHTML = '<div class="w-2 h-2 bg-[var(--error)]"></div> Disconnected';
       const statusText = document.getElementById('status-text');
       if (statusText) statusText.innerHTML = '<span class="w-2 h-2 bg-surface-dot inline-block"></span> STATUS: OFFLINE';
       

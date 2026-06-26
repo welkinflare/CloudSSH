@@ -37,7 +37,7 @@ function initTerminalTab(): void {
   const serverName = params.get('name') || 'Server';
 
   if (!validateWsUrl(wsUrl)) {
-    document.body.innerHTML = '<div style="color:red;padding:2em;font-family:monospace;">Error: Invalid or untrusted WebSocket URL.</div>';
+    document.body.innerHTML = '<div style="color:var(--error);padding:2em;font-family:monospace;">Error: Invalid or untrusted WebSocket URL.</div>';
     return;
   }
 

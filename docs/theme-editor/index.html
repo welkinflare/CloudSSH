@@ -244,6 +244,8 @@
       --on-accent: #022100;
       --surface-dot: #353534;
       --scanline-tint: rgba(74, 246, 38, 0.02);
+      --accent-glow: rgba(74, 246, 38, 0.08);
+      --modal-overlay: rgba(0, 0, 0, 0.8);
     }
 
     /* ===== Login Preview ===== */
@@ -1017,8 +1019,10 @@ const PRESETS = {
       '--accent': '#4af626', '--accent-secondary': '#14d1ff', '--accent-secondary-light': '#b7eaff',
       '--border': '#1f1f1f', '--border-strong': '#3c4b36',
       '--error': '#ffb4ab', '--error-bg': '#93000a',
-      '--on-accent': '#022100', '--surface-dot': '#353534',
+      '--on-accent': '#022100',       '--surface-dot': '#353534',
       '--scanline-tint': 'rgba(74, 246, 38, 0.02)',
+      '--accent-glow': 'rgba(74, 246, 38, 0.08)',
+      '--modal-overlay': 'rgba(0, 0, 0, 0.8)',
     }
   },
   glacier: {
@@ -1030,8 +1034,10 @@ const PRESETS = {
       '--accent': '#64ffda', '--accent-secondary': '#e6f1ff', '--accent-secondary-light': '#ccd6f6',
       '--border': '#1d3557', '--border-strong': '#495670',
       '--error': '#ff6b6b', '--error-bg': '#3d0000',
-      '--on-accent': '#0a192f', '--surface-dot': '#1d3557',
+      '--on-accent': '#0a192f',       '--surface-dot': '#1d3557',
       '--scanline-tint': 'rgba(100, 255, 218, 0.02)',
+      '--accent-glow': 'rgba(100, 255, 218, 0.08)',
+      '--modal-overlay': 'rgba(0, 0, 0, 0.85)',
     }
   },
   gruvbox: {
@@ -1043,8 +1049,10 @@ const PRESETS = {
       '--accent': '#b8bb26', '--accent-secondary': '#83a598', '--accent-secondary-light': '#8ec07c',
       '--border': '#3c3836', '--border-strong': '#665c54',
       '--error': '#fb4934', '--error-bg': '#3d0000',
-      '--on-accent': '#282828', '--surface-dot': '#3c3836',
+      '--on-accent': '#282828',       '--surface-dot': '#3c3836',
       '--scanline-tint': 'rgba(184, 187, 38, 0.02)',
+      '--accent-glow': 'rgba(184, 187, 38, 0.08)',
+      '--modal-overlay': 'rgba(0, 0, 0, 0.75)',
     }
   }
 };
@@ -1056,7 +1064,7 @@ const VARIABLE_GROUPS = [
   { title: 'BORDERS', vars: ['--border', '--border-strong'] },
   { title: 'ERROR', vars: ['--error', '--error-bg'] },
   { title: 'COMPONENTS', vars: ['--surface-dot'] },
-  { title: 'EFFECTS', vars: ['--scanline-tint'] },
+  { title: 'EFFECTS', vars: ['--scanline-tint', '--accent-glow', '--modal-overlay'] },
 ];
 
 const VARIABLE_LABELS = {
@@ -1077,6 +1085,8 @@ const VARIABLE_LABELS = {
   '--error-bg': 'Error Background',
   '--surface-dot': 'Status Dot',
   '--scanline-tint': 'Scanline Overlay',
+  '--accent-glow': 'Accent Glow',
+  '--modal-overlay': 'Modal Overlay',
 };
 
 let theme = {};
