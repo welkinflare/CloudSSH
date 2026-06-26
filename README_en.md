@@ -79,7 +79,7 @@
 - **Multiple Auth Methods**: Supports standard SSH password authentication as well as Ed25519 plaintext private key authentication.
 - **MitM Protection (TOFU)**: Automatically extracts and prints the server's Host Key (SHA-256 fingerprint) on the first connection, supporting Ed25519/ECDSA/RSA signature verification.
 - **Geek Terminal Experience**: Powered by `@xterm/xterm` and the `@xterm/addon-webgl` hardware acceleration rendering engine, ensuring silky smooth scrolling even with massive log outputs.
-- **Customizable UI**: Switch seamlessly between classic terminal themes like Cyberpunk, Glacier, and Gruvbox, fully optimized for mobile devices.
+- **Customizable UI**: All colors are powered by a CSS variable system, with built-in Cyberpunk, Glacier, and Gruvbox themes switchable in one click. Supports importing custom JSON theme files (auto-synced to the cloud for logged-in users, working across browsers), with a companion [Visual Theme Editor](https://github.com/newbietan/CloudSSH/tree/test/docs/theme-editor) for live color customization and export. Fully optimized for mobile devices.
 - **Native File Transfer**: Integrated with [trzsz.js](https://github.com/trzsz/trzsz.js), supporting `trz` (upload) / `tsz` (download) commands for file transfer, fully compatible with tmux sessions. Also supports drag-and-drop file upload to the terminal, directory transfer, and resumable transfers. (Requires [trzsz](https://trzsz.github.io/) installed on the remote server)
 - **GitHub OAuth Integration**: Supports GitHub login, allowing users to save and manage frequently used SSH servers for one-click connections.
 
@@ -254,8 +254,9 @@ CloudSSH/
 │   ├── ssh/                # SSH protocol pure implementation layer
 │   └── worker/             # Worker entry and Durable Objects
 ├── frontend/               # Frontend source (independent workspace)
-│   ├── src/                # TypeScript + xterm.js + trzsz
-│   └── package.json        # Frontend dependencies
+│   └── src/                # TypeScript + xterm.js + trzsz
+├── docs/                   # GitHub Pages static assets
+│   └── theme-editor/       # Visual theme editor
 ├── scripts/                # Build scripts
 ├── pnpm-workspace.yaml     # pnpm workspace configuration
 └── wrangler.toml           # Cloudflare deployment configuration
@@ -335,7 +336,7 @@ test branch (dev/test)  ──merge──>  main branch (production)
 | Layer | Technology | Description |
 |-------|------------|-------------|
 | **Frontend** | TypeScript + Vite + xterm.js | Web terminal emulator, WebGL hardware acceleration |
-| **UI Framework** | Tailwind CSS (CDN) | Cyberpunk-style dark theme |
+| **UI Framework** | Tailwind CSS (CDN) + CSS Variable Theme System | Switchable built-in themes, custom JSON theme import with cloud sync |
 | **File Transfer** | trzsz.js | Supports trz/tsz commands, drag-and-drop upload, resumable transfers |
 | **Backend** | Cloudflare Workers | Serverless edge computing |
 | **Session Management** | Durable Objects | SSH session isolation, Hibernation API |
