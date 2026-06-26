@@ -196,6 +196,18 @@ export class SSHTerminal {
     localStorage.setItem('cloudssh_theme', themeName);
   }
 
+  applyImportedTheme(data: { terminal?: Record<string, string>; ui?: Record<string, string> }): void {
+    if (data.terminal) {
+      this.terminal.options.theme = data.terminal as any;
+    }
+    if (data.ui) {
+      const root = document.documentElement;
+      Object.entries(data.ui).forEach(([prop, val]) => {
+        root.style.setProperty(prop, val);
+      });
+    }
+  }
+
   setSessionClosedHandler(handler: (event: CloseEvent) => void): void {
     this.onSessionClosed = handler;
   }

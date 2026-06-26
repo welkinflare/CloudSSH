@@ -156,9 +156,52 @@ const themeSelector = document.getElementById('theme-selector') as HTMLSelectEle
 themeSelector?.addEventListener('change', (e) => {
   const theme = (e.target as HTMLSelectElement).value as keyof typeof THEMES;
   terminal.setTheme(theme);
+  localStorage.removeItem('cloudssh_imported_theme');
+});
+
+// ==================== 主题导入 ====================
+
+const importThemeBtn = document.getElementById('import-theme-btn');
+const importThemeInput = document.getElementById('import-theme-input') as HTMLInputElement | null;
+
+importThemeBtn?.addEventListener('click', () => {
+  importThemeInput?.click();
+});
+
+importThemeInput?.addEventListener('change', (e) => {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target!.result as string);
+      if (!data.ui || typeof data.ui !== 'object') {
+        alert('无效的主题文件：缺少 "ui" 字段');
+        return;
+      }
+      terminal.applyImportedTheme(data);
+      localStorage.setItem('cloudssh_imported_theme', JSON.stringify(data));
+      if (themeSelector) themeSelector.value = '';
+    } catch {
+      alert('无效的 JSON 文件');
+    }
+  };
+  reader.readAsText(file);
+  importThemeInput.value = '';
 });
 
 function restoreTheme(): void {
+  const importedRaw = localStorage.getItem('cloudssh_imported_theme');
+  if (importedRaw) {
+    try {
+      const data = JSON.parse(importedRaw);
+      terminal.applyImportedTheme(data);
+      return;
+    } catch {
+      localStorage.removeItem('cloudssh_imported_theme');
+    }
+  }
   const saved = localStorage.getItem('cloudssh_theme') as keyof typeof THEMES | null;
   if (saved && THEMES[saved]) {
     terminal.setTheme(saved);
