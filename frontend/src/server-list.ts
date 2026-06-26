@@ -169,11 +169,11 @@ export class ServerList {
         </div>
 
         <div class="flex gap-2 pt-3 border-t border-[var(--border)]">
-          <button id="connect-${server.id}" class="cyber-button flex-1 py-1.5 px-3 text-[10px] font-bold tracking-[0.1em] uppercase flex items-center justify-center gap-1" title="Connect">
+          <button id="connect-${server.id}" class="cyber-button text-primary flex-1 py-1.5 px-3 text-[10px] font-bold tracking-[0.1em] uppercase flex items-center justify-center gap-1" title="Connect">
             <span class="material-symbols-outlined" style="font-size: 14px;">power_settings_new</span>
             CONNECT
           </button>
-          <button id="edit-${server.id}" class="cyber-button py-1.5 px-3 text-[10px] font-bold tracking-[0.1em] flex items-center justify-center" title="Edit">
+          <button id="edit-${server.id}" class="cyber-button text-primary py-1.5 px-3 text-[10px] font-bold tracking-[0.1em] flex items-center justify-center" title="Edit">
             <span class="material-symbols-outlined" style="font-size: 14px;">edit</span>
           </button>
           <button id="delete-${server.id}" class="cyber-button py-1.5 px-3 text-[10px] font-bold tracking-[0.1em] flex items-center justify-center text-error border-[var(--error)] hover:bg-[var(--error)] hover:text-[var(--bg)]" title="Delete">

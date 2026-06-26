@@ -99,7 +99,7 @@ body {
 }
 
 .cyber-button {
-  border: 1px solid var(--accent); color: var(--accent);
+  border: 1px solid var(--accent);
   transition: all 0.2s ease; position: relative; overflow: hidden;
   cursor: pointer;
 }
