@@ -12,6 +12,12 @@ const SHELL_FIELD = encodeString('shell');
 const XTERM_256COLOR_FIELD = encodeString('xterm-256color');
 const WINDOW_CHANGE_FIELD = encodeString('window-change');
 const EMPTY_TERMINAL_MODES_FIELD = encodeString(new Uint8Array([0]));
+const UINT32_MAX = 0xffffffff;
+
+export interface ChannelDataPacket {
+  payload: Uint8Array;
+  bytesConsumed: number;
+}
 
 function writeBytes(target: Uint8Array, offset: number, source: Uint8Array): number {
   target.set(source, offset);
@@ -48,7 +54,9 @@ export class SSHChannel {
     this.remoteWindowSize = readUint32(payload, offset);
     offset += 4;
     const serverMaxPacket = readUint32(payload, offset);
-    this.maxPacketSize = Math.min(this.maxPacketSize, serverMaxPacket);
+    if (serverMaxPacket > 0) {
+      this.maxPacketSize = Math.min(this.maxPacketSize, serverMaxPacket);
+    }
   }
 
   buildPTYRequest(cols: number, rows: number): Uint8Array {
@@ -85,13 +93,42 @@ export class SSHChannel {
     return payload;
   }
 
-  buildChannelData(data: Uint8Array): Uint8Array {
+  takeChannelData(data: Uint8Array, offset: number = 0): ChannelDataPacket | null {
+    const bytesAvailable = data.length - offset;
+    if (bytesAvailable <= 0) {
+      return null;
+    }
+
+    const bytesToSend = Math.min(bytesAvailable, this.maxPacketSize, this.remoteWindowSize);
+    if (bytesToSend <= 0) {
+      return null;
+    }
+
+    this.remoteWindowSize -= bytesToSend;
+    return {
+      payload: this.buildChannelDataPacket(data.subarray(offset, offset + bytesToSend)),
+      bytesConsumed: bytesToSend,
+    };
+  }
+
+  private buildChannelDataPacket(data: Uint8Array): Uint8Array {
     const payload = new Uint8Array(9 + data.length);
     payload[0] = SSH_MSG_CHANNEL_DATA;
     writeUint32(payload, 1, this.remoteChannelID);
     writeUint32(payload, 5, data.length);
     payload.set(data, 9);
     return payload;
+  }
+
+  handleWindowAdjust(payload: Uint8Array): number {
+    const recipientChannelID = readUint32(payload, 1);
+    if (recipientChannelID !== this.localChannelID) {
+      return 0;
+    }
+
+    const bytesToAdd = readUint32(payload, 5);
+    this.remoteWindowSize = Math.min(UINT32_MAX, this.remoteWindowSize + bytesToAdd);
+    return bytesToAdd;
   }
 
   handleChannelData(payload: Uint8Array): Uint8Array {

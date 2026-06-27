@@ -45,6 +45,7 @@ import { SSHAuth } from '../ssh/auth';
 import { SSHChannel } from '../ssh/channel';
 
 export class SSHSession {
+  private readonly textEncoder = new TextEncoder();
   private ws: WebSocket;
   private socket: any;
   private config: SSHConnectionConfig;
@@ -62,6 +63,10 @@ export class SSHSession {
   private seqNumSend: number = 0;
   private sessionID: Uint8Array | null = null;
   private sendMutex: Promise<void> = Promise.resolve();
+  private channelDataQueue: Uint8Array[] = [];
+  private channelDataQueueHead: number = 0;
+  private channelDataQueueOffset: number = 0;
+  private channelDataFlushInProgress: boolean = false;
 
   private kexInitLocal: Uint8Array | null = null;
   private kexInitRemote: Uint8Array | null = null;
@@ -942,6 +947,8 @@ export class SSHSession {
       }
 
       case SSH_MSG_CHANNEL_WINDOW_ADJUST:
+        this.channel.handleWindowAdjust(payload);
+        void this.flushChannelDataQueue();
         break;
 
       case SSH_MSG_CHANNEL_EOF:
@@ -982,14 +989,51 @@ export class SSHSession {
 
       if (this.state !== 'ready') return;
       
-      const encoded = new TextEncoder().encode(data);
-      const channelData = this.channel.buildChannelData(encoded);
-      await this.sendEncrypted(channelData);
+      this.enqueueChannelData(this.textEncoder.encode(data));
     } else {
       if (this.state !== 'ready') return;
 
-      const channelData = this.channel.buildChannelData(new Uint8Array(data));
-      await this.sendEncrypted(channelData);
+      this.enqueueChannelData(new Uint8Array(data));
+    }
+  }
+
+  private enqueueChannelData(data: Uint8Array): void {
+    if (data.length === 0) return;
+
+    this.channelDataQueue.push(data);
+    void this.flushChannelDataQueue();
+  }
+
+  private async flushChannelDataQueue(): Promise<void> {
+    if (this.channelDataFlushInProgress) return;
+
+    this.channelDataFlushInProgress = true;
+    try {
+      while (this.channelDataQueueHead < this.channelDataQueue.length) {
+        const current = this.channelDataQueue[this.channelDataQueueHead];
+        const packet = this.channel.takeChannelData(current, this.channelDataQueueOffset);
+        if (!packet) break;
+
+        await this.sendEncrypted(packet.payload);
+        this.channelDataQueueOffset += packet.bytesConsumed;
+
+        if (this.channelDataQueueOffset >= current.length) {
+          this.channelDataQueueHead++;
+          this.channelDataQueueOffset = 0;
+        }
+      }
+
+      if (this.channelDataQueueHead > 0) {
+        this.channelDataQueue = this.channelDataQueue.slice(this.channelDataQueueHead);
+        this.channelDataQueueHead = 0;
+      }
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      this.sendDebug(`flushChannelDataQueue ERROR: ${errMsg}`);
+      this.sendError('发送数据失败: ' + errMsg);
+      this.close();
+    } finally {
+      this.channelDataFlushInProgress = false;
     }
   }
 
@@ -1051,6 +1095,9 @@ export class SSHSession {
       clearTimeout(this.shellReadyTimeout);
       this.shellReadyTimeout = null;
     }
+    this.channelDataQueue = [];
+    this.channelDataQueueHead = 0;
+    this.channelDataQueueOffset = 0;
     try { this.socket.close(); } catch {}
     try { this.ws.close(normal ? 1000 : 1011); } catch {}
   }

@@ -285,6 +285,8 @@ export class SSHTerminal {
         const statusText = document.getElementById('status-text');
         if (statusText) statusText.innerHTML = '<span class="w-2 h-2 bg-surface-dot inline-block"></span> STATUS: OFFLINE';
       };
+
+      this.setupWebSocketHandlers(reject);
     });
   }
 
