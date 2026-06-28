@@ -282,12 +282,6 @@ export class SSHTerminal {
         reject(new Error('WebSocket connection failed'));
       };
 
-      this.ws.onclose = () => {
-        this.terminal.writeln('\x1b[31m[-] 连接已关闭\x1b[0m');
-        const statusText = document.getElementById('status-text');
-        if (statusText) statusText.innerHTML = '<span class="w-2 h-2 bg-surface-dot inline-block"></span> STATUS: OFFLINE';
-      };
-
       this.setupWebSocketHandlers(reject);
     });
   }
